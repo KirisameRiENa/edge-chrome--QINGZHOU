@@ -1,0 +1,184 @@
+/* ============================================================
+   基础层：重置、排版、页框、氛围、焦点与降级动效
+   ============================================================ */
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+html {
+  background: var(--bg);
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--font-ui);
+  font-size: 15px;
+  line-height: 1.6;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+  transition: background-color var(--dur-3) var(--ease), color var(--dur-3) var(--ease);
+}
+
+h1,
+h2,
+p {
+  margin: 0;
+}
+
+button {
+  margin: 0;
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+}
+
+input {
+  font: inherit;
+  color: inherit;
+}
+
+svg {
+  display: block;
+  flex: none;
+}
+
+/* hidden 属性必须压过组件自己的 display（UA 样式优先级太低） */
+[hidden] {
+  display: none !important;
+}
+
+/* 选中态用强调色的浅版本，不做系统蓝 */
+::selection {
+  background: var(--accent-soft);
+  color: var(--text);
+}
+
+/* 焦点圈：2px + 2px 偏移，键盘可达 */
+:focus-visible {
+  outline: 2px solid var(--ring);
+  outline-offset: 2px;
+  border-radius: var(--r-sm);
+}
+
+/* ---------- 氛围层 ----------
+   纯静态 CSS 渐变 + 一次光栅化的噪点，无 filter，无动画，GPU 成本近零 */
+body::before {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(46rem 34rem at 84% -14%, color-mix(in srgb, var(--accent) 20%, transparent), transparent 62%),
+    radial-gradient(38rem 30rem at -6% 108%, color-mix(in srgb, var(--text) 7%, transparent), transparent 58%);
+}
+
+[data-theme='dark'] body::before {
+  background:
+    radial-gradient(46rem 34rem at 84% -14%, color-mix(in srgb, var(--accent) 14%, transparent), transparent 62%),
+    radial-gradient(38rem 30rem at -6% 108%, color-mix(in srgb, var(--accent) 9%, transparent), transparent 58%);
+}
+
+body::after {
+  content: '';
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: 0.04;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='160' height='160'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+[data-theme='dark'] body::after {
+  opacity: 0.05;
+  mix-blend-mode: screen;
+}
+
+/* 内容永远在氛围层之上 */
+.bar,
+.stage,
+.panel {
+  position: relative;
+  z-index: 1;
+}
+
+/* ---------- 通用原子 ---------- */
+.tiny {
+  font-family: var(--font-mono);
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+/* 版本号保留小写 v，避免被大写成 V1.0.0 */
+.tiny--plain {
+  text-transform: none;
+}
+
+/* ---------- 入场编排：一次错峰序列，只动 opacity / transform ---------- */
+.reveal {
+  opacity: 0;
+  transform: translateY(14px);
+  animation: rise var(--dur-3) var(--ease) forwards;
+  animation-delay: var(--d, 0ms);
+}
+
+@keyframes rise {
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+.bar {
+  animation: fadeIn 700ms var(--ease) both;
+  animation-delay: 420ms;
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* 降级：尊重系统偏好，全部动效关闭 */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .reveal,
+  .bar {
+    opacity: 1;
+    transform: none;
+  }
+}

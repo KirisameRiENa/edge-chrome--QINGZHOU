@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <title>收藏到清昼</title>
+
+    <!-- 与起始页共用主题与配色，弹窗不会突然变成另一种颜色 -->
+    <script>
+      (function () {
+        var root = document.documentElement;
+        try {
+          var mode = localStorage.getItem('qz.theme') || 'auto';
+          var dark =
+            mode === 'dark' ||
+            (mode === 'auto' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+          root.dataset.theme = dark ? 'dark' : 'light';
+
+          var pal = localStorage.getItem('qz.palette');
+          if (pal) root.dataset.palette = pal;
+          if (pal !== 'custom') return;
+
+          var c = JSON.parse(localStorage.getItem('qz.custom') || 'null');
+          if (!c) return;
+
+          var parse = function (h) {
+            return [0, 2, 4].map(function (i) {
+              return parseInt(h.replace('#', '').slice(i, i + 2), 16);
+            });
+          };
+          var hex = function (arr) {
+            return (
+              '#' +
+              arr
+                .map(function (v) {
+                  return Math.max(0, Math.min(255, Math.round(v))).toString(16).padStart(2, '0');
+                })
+                .join('')
+            );
+          };
+          var mix = function (a, b, t) {
+            var pa = parse(a);
+            var pb = parse(b);
+            return hex(
+              pa.map(function (v, i) {
+                return v + (pb[i] - v) * t;
+              })
+            );
+          };
+          var lum = function (h) {
+            var f = function (v) {
+              v /= 255;
+              return v <= 0.03928 ? v / 12.92 : Math.pow((v + 0.055) / 1.055, 2.4);
+            };
+            var p = parse(h);
+            return 0.2126 * f(p[0]) + 0.7152 * f(p[1]) + 0.0722 * f(p[2]);
+          };
+
+          var bg = dark ? mix(c.bg, '#0a0a0a', 0.92) : c.bg;
+          var accent = dark ? mix(c.accent, '#ffffff', 0.38) : c.accent;
+          var lightInk = lum(bg) < 0.32;
+          var ink = lightInk ? '#efeadf' : '#1b1917';
+
+          root.style.setProperty('--bg', bg);
+          root.style.setProperty('--accent', accent);
+          root.style.setProperty('--text', ink);
+          root.style.setProperty('--muted', mix(bg, ink, lightInk ? 0.58 : 0.62));
+          root.style.setProperty('--line', 'color-mix(in srgb, ' + ink + ' 14%, transparent)');
+          root.style.setProperty('--surface', mix(bg, '#ffffff', lightInk ? 0.06 : 0.72));
+          root.style.colorScheme = lightInk ? 'dark' : 'light';
+        } catch (e) {
+          /* 读不到就用默认配色 */
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/popup.css" />
+  </head>
+
+  <body>
+    <div class="pop">
+      <header class="pop__head">
+        <svg class="pop__mark" viewBox="0 0 18 18" aria-hidden="true">
+          <path
+            d="M3.6 12.1a5.4 5.4 0 0 1 10.8 0"
+            fill="none"
+            stroke="var(--accent)"
+            stroke-width="2.4"
+            stroke-linecap="round"
+          />
+          <path d="M2 12.4h14" stroke="var(--text)" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span class="pop__brand" data-i18n="popup.brand">收藏到清昼</span>
+      </header>
+
+      <div class="pop__page">
+        <p class="pop__name" id="pageTitle" data-i18n="popup.loading">正在读取当前页面…</p>
+        <p class="pop__url" id="pageUrl"></p>
+      </div>
+
+      <label class="pop__row">
+        <span class="pop__label" data-i18n="popup.saveTo">收藏到</span>
+        <select class="pop__select" id="folder"></select>
+      </label>
+
+      <button class="pop__btn" id="addBtn" type="button" disabled data-i18n="popup.add">添加到收藏夹</button>
+      <p class="pop__hint" id="hint"></p>
+    </div>
+
+    <script src="scripts/i18n.js"></script>
+    <script src="scripts/store.js"></script>
+    <script src="scripts/popup.js"></script>
+  </body>
+</html>

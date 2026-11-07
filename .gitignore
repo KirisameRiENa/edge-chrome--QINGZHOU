@@ -1,0 +1,13 @@
+# 工作区产物，不发布
+.workbuddy/
+_qa*/
+_block3.js
+
+# 本机操作笔记（含本机路径）
+上传到GitHub.md
+
+# 系统杂项
+.DS_Store
+Thumbs.db
+desktop.ini
+*.log

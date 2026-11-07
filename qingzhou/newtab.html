@@ -1,0 +1,510 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="light">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="color-scheme" content="light dark" />
+    <title>新标签页</title>
+
+    <!-- 首帧之前决定主题，避免深色模式下的白屏闪烁（同步执行，仅读 localStorage） -->
+    <script>
+      (function () {
+        try {
+          var mode = localStorage.getItem('qz.theme') || 'auto';
+          var dark =
+            mode === 'dark' ||
+            (mode === 'auto' &&
+              window.matchMedia('(prefers-color-scheme: dark)').matches);
+          document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+          // 配色在首帧前就挂上，避免先闪一下默认色再变色
+          var pal = localStorage.getItem('qz.palette');
+          if (pal) document.documentElement.dataset.palette = pal;
+
+          // 背景图也在首帧前挂上，避免先闪一下纸面再出图
+          var wall = localStorage.getItem('qz.wall');
+          if (wall) {
+            var root = document.documentElement;
+            root.classList.add('has-wall');
+            root.style.setProperty('--wall-img', 'url("' + wall + '")');
+            root.style.setProperty(
+              '--wall-blur',
+              (parseInt(localStorage.getItem('qz.wallBlur'), 10) || 0) + 'px'
+            );
+          }
+        } catch (e) {
+          /* localStorage 被禁用时静默回落到浅色 */
+        }
+      })();
+    </script>
+
+    <link rel="stylesheet" href="styles/tokens.css" />
+    <link rel="stylesheet" href="styles/base.css" />
+    <link rel="stylesheet" href="styles/newtab.css" />
+  </head>
+
+  <body>
+    <!-- 自定义背景图（可调模糊），永远压在最底层 -->
+    <div class="wall" id="wall" aria-hidden="true"></div>
+
+    <!-- ================= 顶栏 ================= -->
+    <header class="bar bar--top">
+      <div class="brand">
+        <svg class="brand__mark" viewBox="0 0 18 18" aria-hidden="true">
+          <path
+            d="M3.6 12.1a5.4 5.4 0 0 1 10.8 0"
+            fill="none"
+            stroke="var(--accent)"
+            stroke-width="2.4"
+            stroke-linecap="round"
+          />
+          <path d="M2 12.4h14" stroke="var(--text)" stroke-width="1.5" stroke-linecap="round" />
+        </svg>
+        <span class="brand__name">清昼</span>
+        <span class="brand__latin">QINGZHOU</span>
+      </div>
+
+      <div class="bar__actions">
+        <button
+          class="langbtn"
+          id="langBtn"
+          type="button"
+          aria-haspopup="true"
+          aria-expanded="false"
+          aria-controls="langMenu"
+          data-i18n-title="settings.language"
+        >
+          中
+        </button>
+
+        <button class="icon-btn" id="themeBtn" type="button" aria-label="切换深浅色">
+          <!-- 浅色下显示月亮（点击进入深色），深色下显示太阳 -->
+          <svg
+            class="icon-moon"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M20.4 14.6A8.6 8.6 0 1 1 9.4 3.6a6.9 6.9 0 0 0 11 11Z" />
+          </svg>
+          <svg
+            class="icon-sun"
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <circle cx="12" cy="12" r="4.1" />
+            <path d="M12 2.8v2.1M12 19.1v2.1M2.8 12h2.1M19.1 12h2.1M5.5 5.5l1.5 1.5M17 17l1.5 1.5M18.5 5.5 17 7M7 17l-1.5 1.5" />
+          </svg>
+        </button>
+
+        <button
+          class="icon-btn"
+          id="panelBtn"
+          type="button"
+          aria-label="设置"
+          aria-expanded="false"
+          aria-controls="panel"
+        >
+          <svg
+            width="18"
+            height="18"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M4 8h8M16 8h4M4 16h3M11 16h9" />
+            <circle cx="14" cy="8" r="2" />
+            <circle cx="9" cy="16" r="2" />
+          </svg>
+        </button>
+      </div>
+
+    </header>
+
+    <!-- ================= 主舞台 ================= -->
+    <main class="stage">
+      <div class="stack">
+        <p class="greet reveal" style="--d: 0ms">
+          <span class="greet__dash" aria-hidden="true"></span>
+          <span class="greet__text"><span id="greet">你好</span><span class="greet__name" id="greetName"></span></span>
+        </p>
+
+        <h1 class="clock reveal" id="clock" style="--d: 70ms" aria-label="当前时间">
+          <span id="hh">00</span><span class="clock__colon" aria-hidden="true"></span><span id="mm">00</span>
+        </h1>
+
+        <p class="meta reveal" style="--d: 150ms">
+          <span id="date">—</span>
+          <span class="meta__sep" aria-hidden="true">/</span>
+          <span id="weekday">—</span>
+        </p>
+
+        <div class="searchwrap reveal" style="--d: 240ms">
+          <form class="search" id="searchForm" autocomplete="off">
+            <button
+              class="chip"
+              id="engineBtn"
+              type="button"
+              aria-haspopup="dialog"
+              aria-expanded="false"
+              aria-controls="panel"
+              title="更换搜索引擎"
+            >
+              <span class="chip__dot" id="engineDot"></span>
+              <span class="chip__name" id="engineName">百度</span>
+              <svg
+                class="chip__caret"
+                width="11"
+                height="11"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+                aria-hidden="true"
+              >
+                <path d="m6 9 6 6 6-6" />
+              </svg>
+            </button>
+
+            <input
+              class="search__input"
+              id="q"
+              name="q"
+              type="text"
+              placeholder="搜索，或输入网址" data-i18n-ph="search.ph"
+              enterkeyhint="go"
+              autocomplete="off"
+              autocapitalize="off"
+              spellcheck="false"
+              aria-label="搜索，或输入网址" data-i18n-aria="search.ph"
+              autofocus
+            />
+
+            <span class="search__hint" id="hint" aria-hidden="true">搜索</span>
+          </form>
+
+          <!-- 搜索历史：点击/聚焦搜索框时浮出，随输入过滤 -->
+          <div class="hist" id="hist" role="group" aria-label="搜索历史" hidden>
+            <ul class="hist__list" id="histList"></ul>
+            <div class="hist__foot">
+              <button class="hist__clear" id="histClear" type="button">清空历史</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </main>
+
+    <!-- ================= 底栏 / 收藏夹 dock ================= -->
+    <div class="bottom reveal" id="bottom" style="--d: 420ms">
+      <div
+        class="daybar"
+        id="dayTrack"
+        role="progressbar"
+        aria-label="今日已过时间"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow="0"
+      >
+        <i class="daybar__fill" id="dayFill"></i>
+      </div>
+
+      <div class="bottom__bar">
+        <button
+          class="dockbtn"
+          id="dockBtn"
+          type="button"
+          aria-haspopup="dialog"
+          aria-expanded="false"
+          aria-controls="dockPanel"
+          title="收藏夹"
+        >
+          <svg
+            width="17"
+            height="17"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.6"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+            aria-hidden="true"
+          >
+            <path d="M6.5 3.5h11a1 1 0 0 1 1 1v15.6a.5.5 0 0 1-.8.4L12 15.9l-5.7 4.6a.5.5 0 0 1-.8-.4V4.5a1 1 0 0 1 1-1Z" />
+          </svg>
+        </button>
+
+        <span class="tiny bottom__meta" id="dayLabel">今日已过 0%</span>
+        <span class="tiny tiny--plain bottom__ver"><span data-i18n="footer.local">本地运行</span> · v2.3.2</span>
+
+        <!-- 悬浮时出现的 dock 条 -->
+        <div class="dockrow" id="dockRow"></div>
+      </div>
+    </div>
+
+    <!-- 展开收藏夹时，页面压一层几乎看不见的暗场，
+         让上面的毛玻璃读起来像"浮起的一张玻璃"而不是又一块纸 -->
+    <div class="dockscrim" id="dockScrim"></div>
+
+    <!-- ================= 收藏夹面板 ================= -->
+    <section class="dockpanel" id="dockPanel" role="dialog" aria-label="收藏夹">
+      <header class="dockpanel__head">
+        <div class="dockpanel__title">
+          <h2 data-i18n="dock.title">收藏夹</h2>
+          <span class="tiny">Bookmarks</span>
+        </div>
+        <span class="dockpanel__count" id="bmCount">0</span>
+        <span class="dockpanel__note" id="bmNote" aria-live="polite"></span>
+        <div class="dockpanel__tools">
+          <label class="bmsearch">
+            <svg
+              width="13"
+              height="13"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.9"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <circle cx="11" cy="11" r="6.4" />
+              <path d="m16 16 4.5 4.5" />
+            </svg>
+            <input
+              class="bmsearch__input"
+              id="bmSearch"
+              type="text"
+              autocomplete="off"
+              spellcheck="false"
+              placeholder="搜索收藏"
+              aria-label="搜索收藏"
+              data-i18n-ph="dock.search"
+              data-i18n-aria="dock.search"
+            />
+          </label>
+          <button class="ghostbtn ghostbtn--icon" id="bmView" type="button" data-i18n-title="dock.viewList" aria-label="切换视图">
+            <svg class="ghostbtn__icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h16" />
+            </svg>
+          </button>
+
+          <button class="ghostbtn ghostbtn--icon" id="bmImport" type="button" data-i18n-title="dock.import">
+            <svg class="ghostbtn__icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 4v11M8 11l4 4 4-4M5 19h14" />
+            </svg>
+            <span class="ghostbtn__label" data-i18n="dock.import">导入书签</span>
+          </button>
+
+          <button class="ghostbtn ghostbtn--icon" id="bmExport" type="button" data-i18n-title="dock.export">
+            <svg class="ghostbtn__icon" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M12 15V4M8 8l4-4 4 4M5 19h14" />
+            </svg>
+            <span class="ghostbtn__label" data-i18n="dock.export">导出</span>
+          </button>
+          <button class="icon-btn icon-btn--sm" id="dockClose" type="button" aria-label="收起收藏夹" data-i18n-aria="dock.close">
+            <svg
+              width="15"
+              height="15"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              stroke-width="1.8"
+              stroke-linecap="round"
+              aria-hidden="true"
+            >
+              <path d="M6 6l12 12M18 6 6 18" />
+            </svg>
+          </button>
+        </div>
+      </header>
+
+      <div class="dockpanel__tabs">
+        <div class="dockpanel__tablist" id="bmTabs" role="tablist" aria-label="收藏分类"></div>
+        <div class="dockpanel__foldertools">
+          <button class="foldertool" id="bmSort" type="button" data-i18n-title="dock.sort" aria-haspopup="true" aria-expanded="false" aria-controls="sortMenu">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M7 4v16M7 20l-3-3M7 20l3-3M17 20V4M17 4l-3 3M17 4l3 3" />
+            </svg>
+          </button>
+
+          <button class="foldertool" id="bmAddFolder" type="button" data-i18n-title="dock.newFolder">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" aria-hidden="true">
+              <path d="M12 5v14M5 12h14" />
+            </svg>
+          </button>
+          <button class="foldertool" id="bmRenameFolder" type="button" data-i18n-title="dock.renameFolder" hidden>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4 20h3.6L19 8.6a2 2 0 0 0-2.8-2.8L4.8 17.2 4 20Z" /><path d="m14.4 7.4 2.8 2.8" />
+            </svg>
+          </button>
+          <button class="foldertool" id="bmDeleteFolder" type="button" data-i18n-title="dock.deleteFolder" hidden>
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M4.5 7h15M9.5 7V4.8h5V7M7 7l.9 12.2h8.2L17 7" />
+            </svg>
+          </button>
+
+          <div class="sortmenu" id="sortMenu" role="menu">
+            <button class="sortmenu__item" type="button" role="menuitemradio" data-sort="default" aria-checked="true" data-i18n="dock.sortDefault">默认顺序</button>
+            <button class="sortmenu__item" type="button" role="menuitemradio" data-sort="name" aria-checked="false" data-i18n="dock.sortName">名称</button>
+            <button class="sortmenu__item" type="button" role="menuitemradio" data-sort="host" aria-checked="false" data-i18n="dock.sortHost">网站</button>
+          </div>
+        </div>
+      </div>
+      <div class="dockpanel__body" id="bmBody"></div>
+
+      <datalist id="bmFolderList"></datalist>
+      <input class="visually-hidden" type="file" id="bmFile" accept=".html,text/html" />
+    </section>
+
+    <!-- 语言菜单放在根层：嵌在顶栏里会被舞台(更上层)挡住点击 -->
+      <div class="langmenu" id="langMenu" role="menu">
+        <button class="langmenu__item" type="button" role="menuitemradio" data-lang="zh" aria-checked="true">
+          中文<span class="langmenu__code">ZH</span>
+        </button>
+        <button class="langmenu__item" type="button" role="menuitemradio" data-lang="en" aria-checked="false">
+          English<span class="langmenu__code">EN</span>
+        </button>
+        <button class="langmenu__item" type="button" role="menuitemradio" data-lang="ja" aria-checked="false">
+          日本語<span class="langmenu__code">JA</span>
+        </button>
+      </div>
+
+    <!-- ================= 设置面板 ================= -->
+    <div class="panel" id="panel" role="dialog" aria-label="设置" hidden>
+      <div class="panel__head">
+        <h2 data-i18n="settings.title">设置</h2>
+        <button class="icon-btn icon-btn--sm" id="panelClose" type="button" aria-label="关闭面板" data-i18n-aria="settings.close">
+          <svg
+            width="15"
+            height="15"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="1.8"
+            stroke-linecap="round"
+            aria-hidden="true"
+          >
+            <path d="M6 6l12 12M18 6 6 18" />
+          </svg>
+        </button>
+      </div>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.appearance">外观</p>
+        <div class="seg" id="seg" role="radiogroup" aria-label="主题">
+          <button type="button" role="radio" data-mode="auto" aria-checked="true" data-i18n="settings.auto">自动</button>
+          <button type="button" role="radio" data-mode="light" aria-checked="false" data-i18n="settings.light">浅色</button>
+          <button type="button" role="radio" data-mode="dark" aria-checked="false" data-i18n="settings.dark">深色</button>
+        </div>
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.theme">配色</p>
+        <div class="swatches" id="swatches" role="radiogroup" aria-label="配色"></div>
+
+        <!-- 自定义取色：只有选中「自定义」时才出现 -->
+        <div class="custom" id="customBox" hidden>
+          <label class="custom__row">
+            <input class="custom__chip" type="color" id="cBg" aria-label="背景色" />
+            <span class="custom__label">背景色</span>
+            <span class="custom__hex" id="hexBg">#F6F4EF</span>
+          </label>
+          <label class="custom__row">
+            <input class="custom__chip" type="color" id="cAccent" aria-label="强调色" />
+            <span class="custom__label">强调色</span>
+            <span class="custom__hex" id="hexAccent">#76921F</span>
+          </label>
+        </div>
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.background">背景</p>
+        <div class="bgrow">
+          <button class="ghostbtn ghostbtn--sm" id="bgPick" type="button" data-i18n="settings.pickImage">选择图片</button>
+          <button class="ghostbtn ghostbtn--sm" id="bgClear" type="button" hidden data-i18n="settings.remove">移除</button>
+          <span class="bgrow__hint" id="bgHint">默认纸面</span>
+        </div>
+        <label class="slider" for="bgBlur">
+          <span class="slider__label" data-i18n="settings.blur">模糊</span>
+          <input class="slider__input" id="bgBlur" type="range" min="0" max="40" step="2" value="0" disabled />
+          <span class="slider__val" id="bgBlurVal">0</span>
+        </label>
+        <input class="visually-hidden" id="bgFile" type="file" accept="image/*" />
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="dock.glassSection">面板</p>
+        <label class="slider" for="glassRange">
+          <span class="slider__label" data-i18n="dock.glass">毛玻璃</span>
+          <input class="slider__input" id="glassRange" type="range" min="0" max="95" step="5" value="44" />
+          <span class="slider__val" id="glassVal">44%</span>
+        </label>
+
+        <div class="switchrow">
+          <span class="switchrow__label" data-i18n="dock.pinnedOnly">Dock 只显示置顶</span>
+          <button class="switch" id="dockPinnedSwitch" type="button" role="switch" aria-checked="false"></button>
+        </div>
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.progress">进度</p>
+        <div class="seg seg--4" id="segProgress" role="radiogroup" aria-label="进度单位">
+          <button type="button" role="radio" data-unit="day" aria-checked="true" data-i18n="settings.day">日</button>
+          <button type="button" role="radio" data-unit="week" aria-checked="false" data-i18n="settings.week">周</button>
+          <button type="button" role="radio" data-unit="month" aria-checked="false" data-i18n="settings.month">月</button>
+          <button type="button" role="radio" data-unit="year" aria-checked="false" data-i18n="settings.year">年</button>
+        </div>
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.name">称呼</p>
+        <input
+          class="textfield"
+          id="nameInput"
+          type="text"
+          maxlength="12"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="怎么称呼你？留空则不显示"
+          data-i18n-ph="settings.namePh"
+        />
+      </section>
+
+      <section class="panel__group">
+        <p class="label" data-i18n="settings.search">搜索引擎</p>
+        <div class="engines" id="engines" role="radiogroup" aria-label="搜索引擎"></div>
+
+        <div class="engineform" id="engineForm" hidden>
+          <input class="textfield" id="engineNameInput" type="text" maxlength="24" autocomplete="off" placeholder="名称" data-i18n-ph="engine.name" />
+          <input class="textfield" id="engineUrlInput" type="text" autocomplete="off" placeholder="网址（用 %s 代表关键词）" data-i18n-ph="engine.url" />
+          <div class="engineform__foot">
+            <span class="engineform__err" id="engineErr"></span>
+            <button class="ghostbtn" id="engineCancel" type="button" data-i18n="engine.cancel">取消</button>
+            <button class="ghostbtn ghostbtn--primary" id="engineSave" type="button" data-i18n="engine.save">保存</button>
+          </div>
+        </div>
+      </section>
+
+      <p class="panel__foot" data-i18n="settings.foot">设置仅保存在这台设备上，扩展不发起任何网络请求，也没有后台进程。</p>
+    </div>
+
+    <script src="scripts/i18n.js"></script>
+    <script src="scripts/store.js"></script>
+    <script src="scripts/newtab.js"></script>
+  </body>
+</html>
